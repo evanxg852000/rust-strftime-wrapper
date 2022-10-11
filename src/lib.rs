@@ -54,7 +54,7 @@ extern "C" {
     fn gmtime_r(timestamp: *const c_time_t, tm: *mut tm) -> *mut tm;
     fn strftime(s: *mut c_char, maxsize: usize, format: *const c_char, timeptr: *const tm) -> usize;
     fn strptime(s: *const c_char, format: *const c_char, timeptr: *const tm) -> *mut c_char;
-    fn mktime(timeptr: *mut tm) -> i64;
+    fn timegm(timeptr: *mut tm) -> i64;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -126,21 +126,23 @@ pub fn parse_strftime(date_time: impl AsRef<str>, format: impl AsRef<str>) -> Re
     }.is_null() {
         return Err(Error::DateTimeParseError);
     }
+    let time_offset = tm.tm_gmtoff;
+
     // Use original value for error checking.
-    // mktime does not make use of fields (tm_wday, tm_yday) to calculate time_t,
+    // timegm does not make use of fields (tm_wday, tm_yday) to calculate time_t,
     // but if it succeeds, the value changes.
     tm.tm_yday = -1; 
-    let timestamp = unsafe { mktime(&mut tm as *mut tm) };
+    let timestamp = unsafe { timegm(&mut tm as *mut tm) };
     if timestamp == -1 && tm.tm_yday == -1 {
         return Err(Error::TimestampOverflowError);
     }
-    
-    return Ok(timestamp)
+
+    return Ok(timestamp - time_offset)
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDateTime;
+    use chrono::{NaiveDateTime, DateTime};
     use crate::{parse_strftime, strftime_format};
 
     #[test]
@@ -156,6 +158,14 @@ mod tests {
         let timestamp = parse_strftime("2022-11-22 10:12:30", "%Y-%m-%d %H:%M:%S").unwrap();
         let expected_timestamp = NaiveDateTime::parse_from_str("2022-11-22 10:12:30", "%Y-%m-%d %H:%M:%S").unwrap().timestamp();
         assert_eq!(timestamp, expected_timestamp); 
+
+        let timestamp = parse_strftime("2022-11-22 10:12:30 -02:00", "%Y-%m-%d %H:%M:%S %z").unwrap();
+        let expected_timestamp = DateTime::parse_from_str("2022-11-22 10:12:30 -02:00", "%Y-%m-%d %H:%M:%S %z").unwrap().timestamp();
+        assert_eq!(timestamp, expected_timestamp);
+
+        let timestamp = parse_strftime("2022-11-22 10:12:30 +02:00", "%Y-%m-%d %H:%M:%S %z").unwrap();
+        let expected_timestamp = DateTime::parse_from_str("2022-11-22 10:12:30 +02:00", "%Y-%m-%d %H:%M:%S %z").unwrap().timestamp();
+        assert_eq!(timestamp, expected_timestamp);
     }
 
     #[test]
@@ -163,5 +173,7 @@ mod tests {
         let timestamp = NaiveDateTime::parse_from_str("1969-12-31 23:59:59", "%Y-%m-%d %H:%M:%S").unwrap().timestamp();
         let date_time = strftime_format(timestamp, "%Y-%m-%d %H:%M:%S").unwrap();
         assert_eq!(date_time, "1969-12-31 23:59:59");
+        let ts = 1669111950;
+        println!("{}", strftime_format(ts, "%Y-%m-%d %H:%M:%S").unwrap());
     }
 }
