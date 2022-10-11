@@ -1,0 +1,14 @@
+[package]
+name = "rust-strftime-wrapper"
+version = "0.0.1"
+edition = "2018"
+authors = ["Evance Soumaoro <evanxg852000@gmail.com>"]
+description = "A wrapper around strftime and strptime."
+keywords = ["timestamp", "format", "strftime", "strptime", "unix"]
+license = "MIT"
+homepage = "https://github.com/evanxg852000/rust-strftime-wrapper"
+repository = "https://github.com/evanxg852000/rust-strftime-wrapper"
+readme = "README.md"
+
+[dev-dependencies]
+chrono = "0.4.22"
